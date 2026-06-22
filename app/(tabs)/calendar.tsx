@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Dimensions,
   FlatList,
   Platform,
   Pressable,
@@ -292,8 +293,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   dayCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
+    width: Math.floor((Dimensions.get("window").width - 16) / 7),
+    height: Math.floor((Dimensions.get("window").width - 16) / 7),
     alignItems: "center",
     justifyContent: "center",
     padding: 2,
