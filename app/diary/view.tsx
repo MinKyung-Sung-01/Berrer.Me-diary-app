@@ -21,14 +21,14 @@ import {
   formatDate,
   getEntry,
 } from "@/lib/diary-storage";
-import { getTodaysQuestions } from "@/lib/metacognitive-questions";
+import { getTodaysQuestion } from "@/lib/metacognitive-questions";
 
 export default function ViewDiaryScreen() {
   const colors = useColors();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
-  const [todaysQuestions, setTodaysQuestions] = useState<string[]>([]);
+  const [todaysQuestion, setTodaysQuestion] = useState<string>("");
 
   useFocusEffect(
     useCallback(() => {
@@ -36,8 +36,8 @@ export default function ViewDiaryScreen() {
         getEntry(id).then((e) => {
           setEntry(e);
           if (e) {
-            const questions = getTodaysQuestions(e.date);
-            setTodaysQuestions(questions);
+            const question = getTodaysQuestion(e.date);
+            setTodaysQuestion(question);
           }
         });
       }
@@ -138,18 +138,13 @@ export default function ViewDiaryScreen() {
             )}
 
             {/* Metacognitive Questions */}
-            {todaysQuestions.length > 0 && entry.metacognitiveAnswers && entry.metacognitiveAnswers.length > 0 && (
+            {todaysQuestion && entry.metacognitiveAnswers && entry.metacognitiveAnswers.length > 0 && (
               <View style={[styles.questionsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Text style={[styles.questionsSectionTitle, { color: colors.foreground }]}>오늘의 성찰</Text>
-                {todaysQuestions.map((question, idx) => {
-                  const answer = entry.metacognitiveAnswers?.[idx];
-                  return answer ? (
-                    <View key={idx} style={styles.reflectionItem}>
-                      <Text style={[styles.reflectionQuestion, { color: colors.muted }]}>Q{idx + 1}: {question}</Text>
-                      <Text style={[styles.reflectionAnswer, { color: colors.foreground }]}>{answer}</Text>
-                    </View>
-                  ) : null;
-                })}
+                <View style={styles.reflectionItem}>
+                  <Text style={[styles.reflectionQuestion, { color: colors.muted }]}>{todaysQuestion}</Text>
+                  <Text style={[styles.reflectionAnswer, { color: colors.foreground }]}>{entry.metacognitiveAnswers[0]}</Text>
+                </View>
               </View>
             )}
 

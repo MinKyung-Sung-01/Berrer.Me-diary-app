@@ -29,7 +29,7 @@ import {
   todayString,
   upsertEntry,
 } from "@/lib/diary-storage";
-import { getTodaysQuestions } from "@/lib/metacognitive-questions";
+import { getTodaysQuestion, getNextQuestion } from "@/lib/metacognitive-questions";
 
 export default function EditDiaryScreen() {
   const colors = useColors();
@@ -49,14 +49,14 @@ export default function EditDiaryScreen() {
   const [modalTime, setModalTime] = useState("");
 
   // 메타인지 질문 state
-  const [todaysQuestions, setTodaysQuestions] = useState<string[]>([]);
-  const [questionAnswers, setQuestionAnswers] = useState<string[]>(["", ""]);
+  const [todaysQuestion, setTodaysQuestion] = useState<string>("");
+  const [questionAnswer, setQuestionAnswer] = useState<string>("");
 
   useFocusEffect(
     useCallback(() => {
       // 메타인지 질문 로드
-      const questions = getTodaysQuestions(date);
-      setTodaysQuestions(questions);
+      const question = getTodaysQuestion(date);
+      setTodaysQuestion(question);
 
       if (params.id) {
         getEntry(params.id).then((entry) => {
@@ -65,11 +65,11 @@ export default function EditDiaryScreen() {
             setWeather(entry.weather);
             setMood(entry.mood);
             setItems(entry.items);
-            setQuestionAnswers(entry.metacognitiveAnswers ?? ["", ""]);
+            setQuestionAnswer(entry.metacognitiveAnswers?.[0] ?? "");
           }
         });
       } else {
-        setQuestionAnswers(["", ""]);
+        setQuestionAnswer("");
       }
     }, [date, params.id])
   );
@@ -84,7 +84,7 @@ export default function EditDiaryScreen() {
       weather,
       mood,
       items,
-      metacognitiveAnswers: questionAnswers.filter((a) => a.trim()),
+      metacognitiveAnswers: questionAnswer.trim() ? [questionAnswer] : [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -254,45 +254,45 @@ export default function EditDiaryScreen() {
         </View>
 
         {/* Metacognitive Questions */}
-        {todaysQuestions.length > 0 && (
+        {todaysQuestion && (
           <View style={styles.section}>
             <Text style={[styles.sectionLabel, { color: colors.muted }]}>오늘의 성찰</Text>
             <Text style={[styles.sectionDesc, { color: colors.muted }]}>
-              이 질문들에 답해보세요
+              질문을 터치하면 다른 질문을 받을 수 있어요
             </Text>
-            <View style={styles.questionsContainer}>
-              {todaysQuestions.map((question, idx) => (
-                <View key={idx} style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={styles.questionNumber}>
-                    <Text style={[styles.questionNumberText, { color: colors.primary }]}>Q{idx + 1}</Text>
-                  </View>
-                  <View style={styles.questionContent}>
-                    <Text style={[styles.questionText, { color: colors.foreground }]}>{question}</Text>
-                    <TextInput
-                      value={questionAnswers[idx]}
-                      onChangeText={(text) => {
-                        const newAnswers = [...questionAnswers];
-                        newAnswers[idx] = text;
-                        setQuestionAnswers(newAnswers);
-                      }}
-                      placeholder="당신의 생각을 적어보세요..."
-                      placeholderTextColor={colors.muted}
-                      multiline
-                      numberOfLines={3}
-                      style={[
-                        styles.answerInput,
-                        {
-                          backgroundColor: colors.background,
-                          borderColor: colors.border,
-                          color: colors.foreground,
-                        },
-                      ]}
-                      textAlignVertical="top"
-                    />
-                  </View>
-                </View>
-              ))}
-            </View>
+            <Pressable
+              onPress={() => setTodaysQuestion(getNextQuestion(todaysQuestion))}
+              style={({ pressed }) => [
+                styles.questionCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <View style={styles.questionContent}>
+                <Text style={[styles.questionText, { color: colors.foreground }]}>{todaysQuestion}</Text>
+              </View>
+            </Pressable>
+            <TextInput
+              value={questionAnswer}
+              onChangeText={setQuestionAnswer}
+              placeholder="스스로의 생각을 적어보세요..."
+              placeholderTextColor={colors.muted}
+              multiline
+              numberOfLines={4}
+              style={[
+                styles.answerInput,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  color: colors.foreground,
+                  marginTop: 12,
+                },
+              ]}
+              textAlignVertical="top"
+            />
           </View>
         )}
 
