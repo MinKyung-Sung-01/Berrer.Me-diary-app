@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,7 +11,6 @@ import {
   TextInput,
   View,
   Alert,
-  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -75,6 +76,8 @@ export default function EditDiaryScreen() {
   );
 
   const { full, weekday } = formatDate(date);
+  const isToday = date === todayString();
+  const weekdayLabel = isToday ? "오늘" : `${weekday}요일`;
 
   const handleSave = async () => {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -187,7 +190,7 @@ export default function EditDiaryScreen() {
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerDate, { color: colors.foreground }]}>{full}</Text>
-          <Text style={[styles.headerWeekday, { color: colors.muted }]}>{weekday}요일</Text>
+          <Text style={[styles.headerWeekday, { color: colors.muted }]}>{weekdayLabel}</Text>
         </View>
         <Pressable
           onPress={handleSave}
@@ -338,6 +341,11 @@ export default function EditDiaryScreen() {
         transparent
         onRequestClose={() => setModalVisible(false)}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={0}
+        >
         <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <Pressable style={[styles.modalSheet, { backgroundColor: colors.background }]} onPress={() => {}}>
             <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
@@ -447,6 +455,7 @@ export default function EditDiaryScreen() {
             </View>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );

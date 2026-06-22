@@ -75,7 +75,7 @@ export default function HomeScreen() {
             </Text>
             <View style={[styles.weekdayBadge, { backgroundColor: isToday ? colors.primary : colors.border }]}>
               <Text style={[styles.weekdayText, { color: isToday ? "#fff" : colors.muted }]}>
-                {isToday ? "오늘" : weekday}요일
+                {isToday ? "오늘" : `${weekday}요일`}
               </Text>
             </View>
           </View>
