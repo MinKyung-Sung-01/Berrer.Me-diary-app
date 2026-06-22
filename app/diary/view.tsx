@@ -21,17 +21,25 @@ import {
   formatDate,
   getEntry,
 } from "@/lib/diary-storage";
+import { getTodaysQuestions } from "@/lib/metacognitive-questions";
 
 export default function ViewDiaryScreen() {
   const colors = useColors();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [entry, setEntry] = useState<DiaryEntry | null>(null);
+  const [todaysQuestions, setTodaysQuestions] = useState<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       if (id) {
-        getEntry(id).then(setEntry);
+        getEntry(id).then((e) => {
+          setEntry(e);
+          if (e) {
+            const questions = getTodaysQuestions(e.date);
+            setTodaysQuestions(questions);
+          }
+        });
       }
     }, [id])
   );
@@ -126,6 +134,22 @@ export default function ViewDiaryScreen() {
                     <Text style={[styles.metaLabel, { color: colors.muted }]}>기분</Text>
                   </View>
                 )}
+              </View>
+            )}
+
+            {/* Metacognitive Questions */}
+            {todaysQuestions.length > 0 && entry.metacognitiveAnswers && entry.metacognitiveAnswers.length > 0 && (
+              <View style={[styles.questionsSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.questionsSectionTitle, { color: colors.foreground }]}>오늘의 성찰</Text>
+                {todaysQuestions.map((question, idx) => {
+                  const answer = entry.metacognitiveAnswers?.[idx];
+                  return answer ? (
+                    <View key={idx} style={styles.reflectionItem}>
+                      <Text style={[styles.reflectionQuestion, { color: colors.muted }]}>Q{idx + 1}: {question}</Text>
+                      <Text style={[styles.reflectionAnswer, { color: colors.foreground }]}>{answer}</Text>
+                    </View>
+                  ) : null;
+                })}
               </View>
             )}
 
@@ -268,4 +292,15 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  questionsSection: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
+    gap: 12,
+  },
+  questionsSectionTitle: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  reflectionItem: { gap: 6 },
+  reflectionQuestion: { fontSize: 12, fontWeight: "600" },
+  reflectionAnswer: { fontSize: 13, lineHeight: 20 },
 });

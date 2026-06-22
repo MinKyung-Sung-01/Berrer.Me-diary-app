@@ -14,6 +14,7 @@ export interface DiaryEntry {
   weather?: string;
   mood?: string;
   items: DiaryItem[];
+  metacognitiveAnswers?: string[]; // 메타인지적 질문에 대한 답변 (최대 2개)
   createdAt: number;
   updatedAt: number;
 }

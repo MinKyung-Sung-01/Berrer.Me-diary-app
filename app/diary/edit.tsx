@@ -29,6 +29,7 @@ import {
   todayString,
   upsertEntry,
 } from "@/lib/diary-storage";
+import { getTodaysQuestions } from "@/lib/metacognitive-questions";
 
 export default function EditDiaryScreen() {
   const colors = useColors();
@@ -47,8 +48,16 @@ export default function EditDiaryScreen() {
   const [modalContent, setModalContent] = useState("");
   const [modalTime, setModalTime] = useState("");
 
+  // 메타인지 질문 state
+  const [todaysQuestions, setTodaysQuestions] = useState<string[]>([]);
+  const [questionAnswers, setQuestionAnswers] = useState<string[]>(["", ""]);
+
   useFocusEffect(
     useCallback(() => {
+      // 메타인지 질문 로드
+      const questions = getTodaysQuestions(date);
+      setTodaysQuestions(questions);
+
       if (params.id) {
         getEntry(params.id).then((entry) => {
           if (entry) {
@@ -56,10 +65,13 @@ export default function EditDiaryScreen() {
             setWeather(entry.weather);
             setMood(entry.mood);
             setItems(entry.items);
+            setQuestionAnswers(entry.metacognitiveAnswers ?? ["", ""]);
           }
         });
+      } else {
+        setQuestionAnswers(["", ""]);
       }
-    }, [params.id])
+    }, [date, params.id])
   );
 
   const { full, weekday } = formatDate(date);
@@ -72,6 +84,7 @@ export default function EditDiaryScreen() {
       weather,
       mood,
       items,
+      metacognitiveAnswers: questionAnswers.filter((a) => a.trim()),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -239,6 +252,49 @@ export default function EditDiaryScreen() {
             ))}
           </View>
         </View>
+
+        {/* Metacognitive Questions */}
+        {todaysQuestions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.muted }]}>오늘의 성찰</Text>
+            <Text style={[styles.sectionDesc, { color: colors.muted }]}>
+              이 질문들에 답해보세요
+            </Text>
+            <View style={styles.questionsContainer}>
+              {todaysQuestions.map((question, idx) => (
+                <View key={idx} style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={styles.questionNumber}>
+                    <Text style={[styles.questionNumberText, { color: colors.primary }]}>Q{idx + 1}</Text>
+                  </View>
+                  <View style={styles.questionContent}>
+                    <Text style={[styles.questionText, { color: colors.foreground }]}>{question}</Text>
+                    <TextInput
+                      value={questionAnswers[idx]}
+                      onChangeText={(text) => {
+                        const newAnswers = [...questionAnswers];
+                        newAnswers[idx] = text;
+                        setQuestionAnswers(newAnswers);
+                      }}
+                      placeholder="당신의 생각을 적어보세요..."
+                      placeholderTextColor={colors.muted}
+                      multiline
+                      numberOfLines={3}
+                      style={[
+                        styles.answerInput,
+                        {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                          color: colors.foreground,
+                        },
+                      ]}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Items */}
         <View style={styles.section}>
@@ -533,4 +589,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalConfirmText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  sectionDesc: { fontSize: 12, marginTop: -4 },
+  questionsContainer: { gap: 12 },
+  questionCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  questionNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FF8C6922",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  questionNumberText: { fontSize: 12, fontWeight: "700" },
+  questionContent: { gap: 8 },
+  questionText: { fontSize: 14, fontWeight: "500", lineHeight: 20 },
+  answerInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    minHeight: 80,
+    lineHeight: 20,
+  },
 });
