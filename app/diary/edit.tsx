@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -10,7 +10,6 @@ import {
   Text,
   TextInput,
   View,
-  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -32,6 +31,9 @@ import {
 } from "@/lib/diary-storage";
 import { getTodaysQuestion, getNextQuestion } from "@/lib/metacognitive-questions";
 
+// 항목 추가 모달 타입: "category" = 카테고리 선택, "quick" = 직접 입력
+type AddMode = "category" | "quick";
+
 export default function EditDiaryScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -44,10 +46,16 @@ export default function EditDiaryScreen() {
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
+  const [addMode, setAddMode] = useState<AddMode>("category");
   const [editingItem, setEditingItem] = useState<DiaryItem | null>(null);
   const [modalCategory, setModalCategory] = useState(CATEGORIES[0]);
   const [modalContent, setModalContent] = useState("");
   const [modalTime, setModalTime] = useState("");
+
+  // 직접 입력 모드 - 인라인 빠른 추가
+  const [quickInputVisible, setQuickInputVisible] = useState(false);
+  const [quickContent, setQuickContent] = useState("");
+  const quickInputRef = useRef<TextInput>(null);
 
   // 메타인지 질문 state
   const [todaysQuestion, setTodaysQuestion] = useState<string>("");
@@ -55,7 +63,6 @@ export default function EditDiaryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // 메타인지 질문 로드
       const question = getTodaysQuestion(date);
       setTodaysQuestion(question);
 
@@ -95,12 +102,42 @@ export default function EditDiaryScreen() {
     router.back();
   };
 
+  // 카테고리 선택 모달 열기
   const openAddModal = () => {
     setEditingItem(null);
     setModalCategory(CATEGORIES[0]);
     setModalContent("");
     setModalTime("");
+    setAddMode("category");
     setModalVisible(true);
+  };
+
+  // 직접 입력 인라인 열기
+  const openQuickInput = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setQuickContent("");
+    setQuickInputVisible(true);
+    setTimeout(() => quickInputRef.current?.focus(), 100);
+  };
+
+  // 직접 입력 확인
+  const handleQuickAdd = () => {
+    const text = quickContent.trim();
+    if (!text) {
+      setQuickInputVisible(false);
+      return;
+    }
+    const newItem: DiaryItem = {
+      id: generateId(),
+      category: "기타",
+      categoryEmoji: "✏️",
+      content: text,
+      time: undefined,
+    };
+    setItems((prev) => [...prev, newItem]);
+    setQuickContent("");
+    setQuickInputVisible(false);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const openEditModal = (item: DiaryItem) => {
@@ -109,6 +146,7 @@ export default function EditDiaryScreen() {
     setModalCategory(cat);
     setModalContent(item.content);
     setModalTime(item.time ?? "");
+    setAddMode("category");
     setModalVisible(true);
   };
 
@@ -203,7 +241,7 @@ export default function EditDiaryScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Weather */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.muted }]}>날씨</Text>
@@ -306,7 +344,7 @@ export default function EditDiaryScreen() {
             <Text style={[styles.itemCountText, { color: colors.muted }]}>{items.length}개</Text>
           </View>
 
-          {items.length === 0 ? (
+          {items.length === 0 && !quickInputVisible ? (
             <View style={[styles.emptyItems, { borderColor: colors.border }]}>
               <Text style={[styles.emptyItemsText, { color: colors.muted }]}>
                 아직 항목이 없어요{"\n"}아래 버튼을 눌러 추가해 보세요
@@ -318,19 +356,75 @@ export default function EditDiaryScreen() {
             </View>
           )}
 
-          <Pressable
-            onPress={openAddModal}
-            style={({ pressed }) => [
-              styles.addItemBtn,
-              {
-                borderColor: colors.primary,
-                backgroundColor: pressed ? colors.primary + "11" : "transparent",
-              },
-            ]}
-          >
-            <IconSymbol name="plus" size={18} color={colors.primary} />
-            <Text style={[styles.addItemBtnText, { color: colors.primary }]}>항목 추가</Text>
-          </Pressable>
+          {/* 직접 입력 인라인 영역 */}
+          {quickInputVisible && (
+            <View style={[styles.quickInputRow, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+              <Text style={styles.quickInputEmoji}>✏️</Text>
+              <TextInput
+                ref={quickInputRef}
+                value={quickContent}
+                onChangeText={setQuickContent}
+                placeholder="항목 내용을 바로 입력하세요..."
+                placeholderTextColor={colors.muted}
+                style={[styles.quickInput, { color: colors.foreground }]}
+                returnKeyType="done"
+                onSubmitEditing={handleQuickAdd}
+                blurOnSubmit={false}
+                multiline={false}
+              />
+              <Pressable
+                onPress={handleQuickAdd}
+                style={({ pressed }) => [
+                  styles.quickConfirmBtn,
+                  { backgroundColor: quickContent.trim() ? colors.primary : colors.border, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <IconSymbol name="checkmark" size={16} color="#fff" />
+              </Pressable>
+              <Pressable
+                onPress={() => { setQuickInputVisible(false); setQuickContent(""); }}
+                style={({ pressed }) => [styles.quickCancelBtn, { opacity: pressed ? 0.5 : 1 }]}
+                hitSlop={8}
+              >
+                <IconSymbol name="xmark" size={16} color={colors.muted} />
+              </Pressable>
+            </View>
+          )}
+
+          {/* 항목 추가 버튼 2개 */}
+          {!quickInputVisible && (
+            <View style={styles.addBtnsRow}>
+              {/* 직접 입력 버튼 */}
+              <Pressable
+                onPress={openQuickInput}
+                style={({ pressed }) => [
+                  styles.addItemBtnHalf,
+                  {
+                    borderColor: colors.primary,
+                    backgroundColor: pressed ? colors.primary + "11" : "transparent",
+                  },
+                ]}
+              >
+                <IconSymbol name="pencil" size={16} color={colors.primary} />
+                <Text style={[styles.addItemBtnText, { color: colors.primary }]}>직접 입력</Text>
+              </Pressable>
+
+              {/* 카테고리 선택 버튼 */}
+              <Pressable
+                onPress={openAddModal}
+                style={({ pressed }) => [
+                  styles.addItemBtnHalf,
+                  {
+                    borderColor: colors.muted,
+                    backgroundColor: pressed ? colors.surface : "transparent",
+                  },
+                ]}
+              >
+                <IconSymbol name="plus" size={16} color={colors.muted} />
+                <Text style={[styles.addItemBtnText, { color: colors.muted }]}>카테고리 선택</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -521,17 +615,47 @@ const styles = StyleSheet.create({
   itemTime: { fontSize: 12, marginLeft: "auto" },
   itemText: { fontSize: 14, lineHeight: 20 },
   itemDeleteBtn: { padding: 12 },
-  addItemBtn: {
+  // 직접 입력 인라인
+  quickInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  quickInputEmoji: { fontSize: 18 },
+  quickInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 2,
+  },
+  quickConfirmBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickCancelBtn: { padding: 4 },
+  // 항목 추가 버튼 2개 나란히
+  addBtnsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  addItemBtnHalf: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
     borderWidth: 1.5,
     borderStyle: "dashed",
     borderRadius: 12,
     paddingVertical: 14,
   },
-  addItemBtnText: { fontSize: 15, fontWeight: "600" },
+  addItemBtnText: { fontSize: 14, fontWeight: "600" },
   // Modal
   modalOverlay: {
     flex: 1,
