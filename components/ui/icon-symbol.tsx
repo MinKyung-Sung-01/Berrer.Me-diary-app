@@ -27,6 +27,7 @@ const MAPPING = {
   "checkmark": "check",
   "chevron.left": "chevron-left",
   "ellipsis": "more-horiz",
+  "magnifyingglass": "search",
 } as IconMapping;
 
 /**

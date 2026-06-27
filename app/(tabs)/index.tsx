@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -26,12 +27,35 @@ export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       loadEntries().then(setEntries);
     }, [])
   );
+
+  // 검색 필터링
+  const filteredEntries = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((entry) => {
+      // 날짜 검색
+      const { full } = formatDate(entry.date);
+      if (full.includes(q) || entry.date.includes(q)) return true;
+      // 항목 내용 및 카테고리 검색
+      if (entry.items.some((item) =>
+        item.content.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q)
+      )) return true;
+      // 메타인지 질문 답변 검색
+      if (entry.metacognitiveAnswers?.some((ans) =>
+        ans.toLowerCase().includes(q)
+      )) return true;
+      return false;
+    });
+  }, [entries, searchQuery]);
 
   const handleNewDiary = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -50,10 +74,19 @@ export default function HomeScreen() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const handleSearchToggle = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isSearching) {
+      setIsSearching(false);
+      setSearchQuery("");
+    } else {
+      setIsSearching(true);
+    }
+  };
+
   const renderEntry = ({ item }: { item: DiaryEntry }) => {
     const { full, weekday } = formatDate(item.date);
     const isToday = item.date === todayString();
-    const preview = item.items[0]?.content ?? "";
 
     return (
       <Pressable
@@ -133,49 +166,115 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>나의 일기장</Text>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Berrer.Me</Text>
           <Text style={[styles.headerSub, { color: colors.muted }]}>
             {entries.length}개의 일기
           </Text>
         </View>
-        <Pressable
-          onPress={handleNewDiary}
-          style={({ pressed }) => [
-            styles.addBtn,
-            { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.95 : 1 }] },
-          ]}
-        >
-          <IconSymbol name="plus" size={22} color="#fff" />
-        </Pressable>
-      </View>
-
-      {/* List */}
-      {entries.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>📖</Text>
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-            아직 일기가 없어요
-          </Text>
-          <Text style={[styles.emptyDesc, { color: colors.muted }]}>
-            오늘 있었던 일들을 기록해 보세요
-          </Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleSearchToggle}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              {
+                backgroundColor: isSearching ? colors.primary : colors.surface,
+                borderColor: colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <IconSymbol
+              name={isSearching ? "xmark" : "magnifyingglass"}
+              size={20}
+              color={isSearching ? "#fff" : colors.foreground}
+            />
+          </Pressable>
           <Pressable
             onPress={handleNewDiary}
             style={({ pressed }) => [
-              styles.emptyBtn,
-              { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.97 : 1 }] },
+              styles.addBtn,
+              { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.95 : 1 }] },
             ]}
           >
-            <Text style={styles.emptyBtnText}>첫 일기 쓰기</Text>
+            <IconSymbol name="plus" size={22} color="#fff" />
           </Pressable>
+        </View>
+      </View>
+
+      {/* Search Bar */}
+      {isSearching && (
+        <View style={[styles.searchBar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+          <IconSymbol name="magnifyingglass" size={18} color={colors.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder="일기 내용, 카테고리, 날짜 검색..."
+            placeholderTextColor={colors.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && Platform.OS !== "ios" && (
+            <Pressable
+              onPress={() => setSearchQuery("")}
+              style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+              hitSlop={8}
+            >
+              <IconSymbol name="xmark" size={16} color={colors.muted} />
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* List */}
+      {filteredEntries.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          {isSearching && searchQuery.length > 0 ? (
+            <>
+              <Text style={styles.emptyEmoji}>🔍</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                검색 결과가 없어요
+              </Text>
+              <Text style={[styles.emptyDesc, { color: colors.muted }]}>
+                "{searchQuery}"에 해당하는 일기를 찾지 못했어요
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyEmoji}>📖</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                아직 일기가 없어요
+              </Text>
+              <Text style={[styles.emptyDesc, { color: colors.muted }]}>
+                오늘 있었던 일들을 기록해 보세요
+              </Text>
+              <Pressable
+                onPress={handleNewDiary}
+                style={({ pressed }) => [
+                  styles.emptyBtn,
+                  { backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.97 : 1 }] },
+                ]}
+              >
+                <Text style={styles.emptyBtnText}>첫 일기 쓰기</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       ) : (
         <FlatList
-          data={entries}
+          data={filteredEntries}
           keyExtractor={(item) => item.id}
           renderItem={renderEntry}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            isSearching && searchQuery.length > 0 ? (
+              <Text style={[styles.searchResultCount, { color: colors.muted }]}>
+                {filteredEntries.length}개의 일기를 찾았어요
+              </Text>
+            ) : null
+          }
         />
       )}
     </ScreenContainer>
@@ -194,6 +293,19 @@ const styles = StyleSheet.create({
   headerLeft: { gap: 2 },
   headerTitle: { fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
   headerSub: { fontSize: 13 },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
   addBtn: {
     width: 44,
     height: 44,
@@ -205,6 +317,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: 0.5,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 4,
+  },
+  searchResultCount: {
+    fontSize: 12,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
   listContent: { padding: 16, gap: 12 },
   card: {
